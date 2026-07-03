@@ -117,4 +117,97 @@ public class MainTest {
         OperacionDeEnergia consumo = new ConsumoOperacion(bateria, 10000.0);
         assertThrows(LimiteDeReservaException.class, consumo::ejecutar);
     }
+
+    // ── Rutina ────────────────────────────────────────────────────────────────
+
+    @Test
+    void rutina_ejecuta_todas_las_operaciones_en_orden() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        Rutina rutina = new Rutina();
+        rutina.agregarOperacion(new CargaOperacion(bateria, 500.0));
+        rutina.agregarOperacion(new ConsumoOperacion(bateria, 200.0));
+
+        rutina.ejecutar();
+
+        assertEquals(1300.0, bateria.getNivelEnergia(), DELTA); // 1000 + 500 - 200
+    }
+
+    @Test
+    void rutina_vacia_las_pendientes_luego_de_ejecutar_con_exito() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        Rutina rutina = new Rutina();
+        rutina.agregarOperacion(new CargaOperacion(bateria, 500.0));
+
+        rutina.ejecutar();
+
+        assertTrue(rutina.getPendientes().isEmpty());
+    }
+
+    @Test
+    void rutina_puede_tratarse_como_una_operacion_individual() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        Rutina rutina = new Rutina();
+        rutina.agregarOperacion(new CargaOperacion(bateria, 500.0));
+
+        OperacionDeEnergia operacion = rutina; // tratamiento uniforme
+        operacion.ejecutar();
+
+        assertEquals(1500.0, bateria.getNivelEnergia(), DELTA);
+    }
+
+    @Test
+    void rutina_que_falla_revierte_las_operaciones_ya_ejecutadas_y_deja_el_estado_original() {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        Rutina rutina = new Rutina();
+        rutina.agregarOperacion(new CargaOperacion(bateria, 500.0));   // se ejecuta OK: 1500
+        rutina.agregarOperacion(new ConsumoOperacion(bateria, 100.0)); // se ejecuta OK: 1400
+        rutina.agregarOperacion(new ConsumoOperacion(bateria, 100000.0)); // falla: supera reserva
+
+        assertThrows(LimiteDeReservaException.class, rutina::ejecutar);
+
+        assertEquals(1000.0, bateria.getNivelEnergia(), DELTA);
+    }
+
+    @Test
+    void rutina_que_falla_tambien_queda_sin_pendientes() {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        Rutina rutina = new Rutina();
+        rutina.agregarOperacion(new CargaOperacion(bateria, 500.0));
+        rutina.agregarOperacion(new ConsumoOperacion(bateria, 100000.0));
+
+        assertThrows(LimiteDeReservaException.class, rutina::ejecutar);
+
+        assertTrue(rutina.getPendientes().isEmpty());
+    }
+
+    @Test
+    void rutina_anidada_se_revierte_completa_si_falla_una_operacion_posterior() {
+        Bateria bateria = new Bateria("B1", 1000.0);
+
+        Rutina rutinaAnidada = new Rutina();
+        rutinaAnidada.agregarOperacion(new CargaOperacion(bateria, 500.0));
+        rutinaAnidada.agregarOperacion(new ConsumoOperacion(bateria, 200.0));
+
+        Rutina rutinaPrincipal = new Rutina();
+        rutinaPrincipal.agregarOperacion(rutinaAnidada); // 1000 -> 1300, todo OK dentro de la anidada
+        rutinaPrincipal.agregarOperacion(new ConsumoOperacion(bateria, 100000.0)); // falla
+
+        assertThrows(LimiteDeReservaException.class, rutinaPrincipal::ejecutar);
+
+        assertEquals(1000.0, bateria.getNivelEnergia(), DELTA);
+    }
+
+    @Test
+    void deshacer_manual_de_una_rutina_ya_ejecutada_revierte_todo_su_lote() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        Rutina rutina = new Rutina();
+        rutina.agregarOperacion(new CargaOperacion(bateria, 500.0));
+        rutina.agregarOperacion(new ConsumoOperacion(bateria, 200.0));
+
+        rutina.ejecutar();
+        assertEquals(1300.0, bateria.getNivelEnergia(), DELTA);
+
+        rutina.deshacer();
+        assertEquals(1000.0, bateria.getNivelEnergia(), DELTA);
+    }
 }
