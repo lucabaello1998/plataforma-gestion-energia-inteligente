@@ -2,12 +2,16 @@ package ar.edu.unahur.obj2.energia;
 
 import ar.edu.unahur.obj2.energia.excepciones.LimiteDeReservaException;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Bateria {
 
     public static final Double LIMITE_RESERVA = -5000.0;
 
     private final String id;
     private Double nivelEnergia;
+    private final List<SistemaInteresado> interesados = new ArrayList<>();
 
     public Bateria(String id, Double nivelEnergiaInicial) {
         this.id = id;
@@ -24,6 +28,7 @@ public class Bateria {
 
     public void cargar(Double kwh) {
         nivelEnergia += kwh;
+        notificarCarga(kwh);
     }
 
     public void consumir(Double kwh) throws LimiteDeReservaException {
@@ -33,6 +38,27 @@ public class Bateria {
                             + " kWh: se superaría el límite de reserva de " + LIMITE_RESERVA + " kWh.");
         }
         nivelEnergia -= kwh;
+        notificarConsumo(kwh);
+    }
+
+    public void agregarInteresado(SistemaInteresado interesado) {
+        interesados.add(interesado);
+    }
+
+    public void quitarInteresado(SistemaInteresado interesado) {
+        interesados.remove(interesado);
+    }
+
+    private void notificarCarga(Double kwh) {
+        for (SistemaInteresado interesado : interesados) {
+            interesado.reaccionarACarga(this, kwh);
+        }
+    }
+
+    private void notificarConsumo(Double kwh) {
+        for (SistemaInteresado interesado : interesados) {
+            interesado.reaccionarAConsumo(this, kwh);
+        }
     }
 
     void revertirCarga(Double kwh) {

@@ -210,4 +210,117 @@ public class MainTest {
         rutina.deshacer();
         assertEquals(1000.0, bateria.getNivelEnergia(), DELTA);
     }
+
+    // ── ControladorDeOperaciones ─────────────────────────────────────────────
+
+    @Test
+    void controlador_ejecuta_una_operacion_inmediata() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        ControladorDeOperaciones controlador = new ControladorDeOperaciones();
+
+        controlador.ejecutarInmediata(new CargaOperacion(bateria, 250.0));
+
+        assertEquals(1250.0, bateria.getNivelEnergia(), DELTA);
+    }
+
+    @Test
+    void controlador_registra_y_ejecuta_una_rutina_por_nombre() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        ControladorDeOperaciones controlador = new ControladorDeOperaciones();
+
+        controlador.registrarEnRutina("mantenimiento", new CargaOperacion(bateria, 300.0));
+        controlador.registrarEnRutina("mantenimiento", new ConsumoOperacion(bateria, 100.0));
+        controlador.ejecutarRutina("mantenimiento");
+
+        assertEquals(1200.0, bateria.getNivelEnergia(), DELTA); // 1000 + 300 - 100
+    }
+
+    @Test
+    void controlador_revierte_la_rutina_completa_si_una_operacion_falla() {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        ControladorDeOperaciones controlador = new ControladorDeOperaciones();
+
+        controlador.registrarEnRutina("lote1", new CargaOperacion(bateria, 300.0));
+        controlador.registrarEnRutina("lote1", new ConsumoOperacion(bateria, 100000.0));
+
+        assertThrows(LimiteDeReservaException.class, () -> controlador.ejecutarRutina("lote1"));
+
+        assertEquals(1000.0, bateria.getNivelEnergia(), DELTA);
+    }
+
+    @Test
+    void controlador_permite_reutilizar_el_nombre_de_rutina_luego_de_ejecutarla() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        ControladorDeOperaciones controlador = new ControladorDeOperaciones();
+
+        controlador.registrarEnRutina("diaria", new CargaOperacion(bateria, 100.0));
+        controlador.ejecutarRutina("diaria"); // 1100, y la rutina "diaria" queda vacía
+
+        controlador.registrarEnRutina("diaria", new CargaOperacion(bateria, 50.0));
+        controlador.ejecutarRutina("diaria"); // 1150, no repite la carga anterior
+
+        assertEquals(1150.0, bateria.getNivelEnergia(), DELTA);
+    }
+
+    @Test
+    void controlador_ejecutar_rutina_sin_operaciones_registradas_no_falla() throws LimiteDeReservaException {
+        ControladorDeOperaciones controlador = new ControladorDeOperaciones();
+        assertDoesNotThrow(() -> controlador.ejecutarRutina("inexistente"));
+    }
+
+    // ── Sistemas interesados: suscripción y Registro de Auditoría ────────────
+
+    @Test
+    void auditoria_registra_cargas_y_consumos_exitosos() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        RegistroDeAuditoria auditoria = new RegistroDeAuditoria();
+        bateria.agregarInteresado(auditoria);
+
+        bateria.cargar(200.0);
+        bateria.consumir(50.0);
+
+        assertEquals(2, auditoria.getRegistros().size());
+        assertTrue(auditoria.getRegistros().get(0).contains("carga"));
+        assertTrue(auditoria.getRegistros().get(0).contains("B1"));
+        assertTrue(auditoria.getRegistros().get(1).contains("consumo"));
+    }
+
+    @Test
+    void auditoria_no_registra_consumos_fallidos() {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        RegistroDeAuditoria auditoria = new RegistroDeAuditoria();
+        bateria.agregarInteresado(auditoria);
+
+        assertThrows(LimiteDeReservaException.class, () -> bateria.consumir(100000.0));
+
+        assertTrue(auditoria.getRegistros().isEmpty());
+    }
+
+    @Test
+    void auditoria_central_acumula_eventos_de_multiples_baterias() {
+        Bateria bateria1 = new Bateria("B1", 1000.0);
+        Bateria bateria2 = new Bateria("B2", 500.0);
+        RegistroDeAuditoria auditoria = new RegistroDeAuditoria();
+        bateria1.agregarInteresado(auditoria);
+        bateria2.agregarInteresado(auditoria);
+
+        bateria1.cargar(100.0);
+        bateria2.cargar(50.0);
+
+        assertEquals(2, auditoria.getRegistros().size());
+        assertTrue(auditoria.getRegistros().get(0).contains("B1"));
+        assertTrue(auditoria.getRegistros().get(1).contains("B2"));
+    }
+
+    @Test
+    void quitar_interesado_deja_de_recibir_notificaciones() {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        RegistroDeAuditoria auditoria = new RegistroDeAuditoria();
+        bateria.agregarInteresado(auditoria);
+        bateria.quitarInteresado(auditoria);
+
+        bateria.cargar(500.0);
+
+        assertTrue(auditoria.getRegistros().isEmpty());
+    }
 }
