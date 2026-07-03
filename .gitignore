@@ -1,0 +1,34 @@
+# Docs de plani
+DOCS/
+
+# Excluir la carpeta .vscode/ (configuraciones de VS Code)
+.vscode/
+
+# Excluir la carpeta target/ (artefactos generados por Maven)
+target/
+
+# Excluir archivos específicos de Maven
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Excluir archivos de IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Excluir archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Excluir archivos de logs
+*.log
+*.log.*
+
+# Excluir archivos generados por el sistema operativo
+*.swp
+*.swo
