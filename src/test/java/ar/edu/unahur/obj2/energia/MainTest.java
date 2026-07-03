@@ -323,4 +323,84 @@ public class MainTest {
 
         assertTrue(auditoria.getRegistros().isEmpty());
     }
+
+    // ── NotificadorDeAdministrador ───────────────────────────────────────────
+
+    @Test
+    void notificador_avisa_al_administrador_de_su_propia_bateria() {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        NotificadorDeAdministrador notificador = new NotificadorDeAdministrador("Luca");
+        bateria.agregarInteresado(notificador);
+
+        bateria.cargar(2000.0);
+
+        assertEquals(1, notificador.getMensajesEnviados().size());
+        assertEquals("Se han cargado 2000.0 kWh en su batería B1.", notificador.getMensajesEnviados().get(0));
+        assertEquals("Luca", notificador.getAdministrador());
+    }
+
+    @Test
+    void notificador_avisa_al_administrador_por_consumo() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        NotificadorDeAdministrador notificador = new NotificadorDeAdministrador("Luca");
+        bateria.agregarInteresado(notificador);
+
+        bateria.consumir(300.0);
+
+        assertEquals("Se han consumido 300.0 kWh en su batería B1.", notificador.getMensajesEnviados().get(0));
+    }
+
+    @Test
+    void notificador_no_recibe_eventos_de_otra_bateria() {
+        Bateria bateriaPropia = new Bateria("B1", 1000.0);
+        Bateria bateriaAjena = new Bateria("B2", 1000.0);
+        NotificadorDeAdministrador notificador = new NotificadorDeAdministrador("Luca");
+        bateriaPropia.agregarInteresado(notificador);
+
+        bateriaAjena.cargar(999.0);
+
+        assertTrue(notificador.getMensajesEnviados().isEmpty());
+    }
+
+    // ── AlarmaDeReservaCritica ────────────────────────────────────────────────
+
+    @Test
+    void alarma_no_se_dispara_si_el_nivel_se_mantiene_en_positivo() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 1000.0);
+        AlarmaDeReservaCritica alarma = new AlarmaDeReservaCritica();
+        bateria.agregarInteresado(alarma);
+
+        bateria.consumir(500.0);
+
+        assertTrue(alarma.getAlertas().isEmpty());
+    }
+
+    @Test
+    void alarma_se_dispara_cuando_el_consumo_deja_la_bateria_usando_reserva() throws LimiteDeReservaException {
+        Bateria bateria = new Bateria("B1", 100.0);
+        AlarmaDeReservaCritica alarma = new AlarmaDeReservaCritica();
+        bateria.agregarInteresado(alarma);
+
+        bateria.consumir(150.0); // queda en -50, usa reserva
+
+        assertEquals(1, alarma.getAlertas().size());
+        assertTrue(alarma.getAlertas().get(0).contains("B1"));
+    }
+
+    @Test
+    void un_mismo_movimiento_dispara_reacciones_en_todos_los_interesados_suscriptos() {
+        Bateria bateria = new Bateria("B1", 100.0);
+        RegistroDeAuditoria auditoria = new RegistroDeAuditoria();
+        NotificadorDeAdministrador notificador = new NotificadorDeAdministrador("Luca");
+        AlarmaDeReservaCritica alarma = new AlarmaDeReservaCritica();
+        bateria.agregarInteresado(auditoria);
+        bateria.agregarInteresado(notificador);
+        bateria.agregarInteresado(alarma);
+
+        bateria.cargar(2000.0);
+
+        assertEquals(1, auditoria.getRegistros().size());
+        assertEquals(1, notificador.getMensajesEnviados().size());
+        assertTrue(alarma.getAlertas().isEmpty()); // sigue en positivo
+    }
 }
